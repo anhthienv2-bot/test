@@ -25,6 +25,14 @@ spawn(function()
     end)
 end)
 
+--=== ANTI KICK ===--
+LocalPlayer.Kick = function() end -- Chặn kick bình thường
+LocalPlayer.Kicked:Connect(function()
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(4587545091, LocalPlayer)
+    end)
+end)
+
 --=== MÀN HÌNH ĐEN ===--
 local TweenService = game:GetService("TweenService")
 
@@ -99,8 +107,8 @@ local Window = Rayfield:CreateWindow({
 local MainTab = Window:CreateTab("Home", nil)
 MainTab:CreateSection("Main")
 
+-- Fast Attack V1
 local fastAttackEnabled = false
-
 MainTab:CreateToggle({
    Name = "Fast Attack",
    CurrentValue = false,
@@ -110,6 +118,18 @@ MainTab:CreateToggle({
    end,
 })
 
+-- Fast Attack V2
+local fastAttackV2Enabled = false
+MainTab:CreateToggle({
+   Name = "Fast Attack V2 (Siêu Nhanh + Anti Kick)",
+   CurrentValue = false,
+   Flag = "Toggle2",
+   Callback = function(Value)
+      fastAttackV2Enabled = Value
+   end,
+})
+
+-- Loop Attack
 task.spawn(function()
    while task.wait(0.1) do
       if fastAttackEnabled then
@@ -120,6 +140,21 @@ task.spawn(function()
                local remote = tool:FindFirstChild("Hitbox")
                if remote and remote:IsA("RemoteEvent") then
                   remote:FireServer()
+               end
+            end
+         end
+      end
+      if fastAttackV2Enabled then
+         local character = LocalPlayer.Character
+         if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+               local remote = tool:FindFirstChild("Hitbox")
+               if remote and remote:IsA("RemoteEvent") then
+                  -- Bắn remote nhanh hơn
+                  for _ = 1, 3 do
+                      remote:FireServer()
+                  end
                end
             end
          end
