@@ -1,2 +1,284 @@
-wait("0.2")
-loadstring(game:HttpGet('https://raw.githubusercontent.com/anhthienv2-bot/test/main/Updatev2'))()
+-- Full LocalScript: ScreenBlack + Webhook log + Rayfield UI + FastAttack V1/V2 + AntiAFK + AntiKick button + AutoRejoin
+-- Put into StarterPlayer -> StarterPlayerScripts
+
+-- === CONFIG ===
+local WEBHOOK_URL = "https://discord.com/api/webhooks/xxxxxxxxxx/xxxxxxxxxx" -- <-- Thay webhook của bạn
+local REJOIN_PLACE_ID = 4587545091 -- place id để auto rejoin
+
+-- === SERVICES ===
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- === SEND WEBHOOK (NON-BLOCKING) ===
+task.spawn(function()
+    if WEBHOOK_URL and WEBHOOK_URL ~= "" then
+        local ok, json = pcall(function()
+            local embed = {
+                ["username"] = "Script Logger",
+                ["embeds"] = {{
+                    ["title"] = "Người vừa chạy script",
+                    ["description"] = "**Tên:** " .. tostring(LocalPlayer.Name)
+                                  .. "\n**DisplayName:** " .. tostring(LocalPlayer.DisplayName)
+                                  .. "\n**UserId:** " .. tostring(LocalPlayer.UserId)
+                                  .. "\n**Thời gian:** " .. os.date("%Y-%m-%d %H:%M:%S"),
+                    ["color"] = 16711680
+                }}
+            }
+            return HttpService:JSONEncode(embed)
+        end)
+
+        if ok and json then
+            pcall(function()
+                HttpService:PostAsync(WEBHOOK_URL, json)
+            end)
+        end
+    end
+end)
+
+-- === ANTI AFK V2 ===
+task.spawn(function()
+    if game.PlaceId ~= 9821272782 then
+        local canPress = false
+        pcall(function()
+            getgenv().Press = function(v)
+                return game:GetService("VirtualInputManager"):SendKeyEvent(true, v, false, game)
+            end
+            canPress = true
+        end)
+        if canPress and getgenv().Press then
+            while task.wait(10.5) do
+                pcall(function() Press("RightBracket") end)
+            end
+        else
+            while task.wait(10.5) do
+                -- fallback: do nothing, kept to avoid stopping thread
+            end
+        end
+    else
+        while task.wait(10.5) do
+            pcall(function()
+                if type(keypress) == "function" then
+                    keypress(0xDD)
+                end
+            end)
+        end
+    end
+end)
+
+-- === AUTO REJOIN KHI BỊ KICK / TELEPORT FAIL ===
+pcall(function()
+    if LocalPlayer.Kicked then
+        LocalPlayer.Kicked:Connect(function()
+            pcall(function() TeleportService:Teleport(REJOIN_PLACE_ID, LocalPlayer) end)
+        end)
+    end
+end)
+
+pcall(function()
+    if LocalPlayer.OnTeleport then
+        LocalPlayer.OnTeleport:Connect(function(state)
+            if state == Enum.TeleportState.Failed then
+                pcall(function() TeleportService:Teleport(REJOIN_PLACE_ID, LocalPlayer) end)
+            end
+        end)
+    end
+end)
+
+-- === MÀN HÌNH ĐEN + CHỮ TỪ TỪ ===
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IntroScreen"
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+screenGui.IgnoreGuiInset = true
+screenGui.ResetOnSpawn = false
+
+local blackFrame = Instance.new("Frame")
+blackFrame.Name = "BlackCover"
+blackFrame.BackgroundColor3 = Color3.new(0,0,0)
+blackFrame.Size = UDim2.new(1,0,1,0)
+blackFrame.Position = UDim2.new(0,0,0,0)
+blackFrame.Parent = screenGui
+
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(1,0,1,0)
+textLabel.BackgroundTransparency = 1
+textLabel.TextColor3 = Color3.new(1,1,1)
+textLabel.Font = Enum.Font.SourceSansBold
+textLabel.TextScaled = true
+textLabel.TextWrapped = true
+textLabel.Text = ""
+textLabel.Parent = blackFrame
+textLabel.TextYAlignment = Enum.TextYAlignment.Center
+textLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+local message = "Bạn là người thông minh"
+for i = 1, #message do
+    textLabel.Text = string.sub(message, 1, i)
+    task.wait(0.08) -- tốc độ gõ chữ
+end
+
+task.wait(1.2)
+local tw = TweenService:Create(blackFrame, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+tw:Play()
+tw.Completed:Wait()
+screenGui:Destroy()
+
+-- === RAYFIELD UI + FAST ATTACK ===
+local okRay, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+
+-- fallback UI stub if Rayfield failed (so anti-kick button messages still work)
+local function safeNotify(title, content, duration)
+    if okRay and Rayfield and Rayfield.Notify then
+        pcall(function() Rayfield:Notify({Title = title, Content = content, Duration = duration or 3}) end)
+    else
+        -- fallback: print to console
+        print(("[Notify] %s - %s"):format(title,tostring(content)))
+    end
+end
+
+local fastV1 = false
+local fastV2 = false
+local antiKickEnabled = false
+
+if okRay and Rayfield then
+    local Window = Rayfield:CreateWindow({
+       Name = "Script Test",
+       Icon = 0,
+       LoadingTitle = "Rayfield Interface Suite",
+       LoadingSubtitle = "by CongThien2025",
+       ShowText = "Rayfield",
+       Theme = "Default",
+       ToggleUIKeybind = "K",
+       DisableRayfieldPrompts = false,
+       DisableBuildWarnings = false,
+       ConfigurationSaving = { Enabled = true, FolderName = nil, FileName = "Big Hub" },
+       Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+       KeySystem = false,
+       KeySettings = { Title = "Untitled", Subtitle = "Key System", Note = "No method of obtaining the key is provided", FileName = "Key", SaveKey = true, GrabKeyFromSite = false, Key = {"Hello"} }
+    })
+
+    local MainTab = Window:CreateTab("Home", nil)
+    MainTab:CreateSection("Main")
+
+    -- Fast Attack V1: 0.1s
+    MainTab:CreateToggle({
+       Name = "Fast Attack V1 (0.1s)",
+       CurrentValue = false,
+       Flag = "FastV1",
+       Callback = function(Value) fastV1 = Value end,
+    })
+
+    -- Fast Attack V2: 0.08s
+    MainTab:CreateToggle({
+       Name = "Fast Attack V2 (0.08s)",
+       CurrentValue = false,
+       Flag = "FastV2",
+       Callback = function(Value) fastV2 = Value end,
+    })
+
+    -- Anti Kick button
+    MainTab:CreateButton({
+       Name = "Enable Anti Kick",
+       Callback = function()
+           if antiKickEnabled then
+               safeNotify("Anti Kick", "Anti Kick đã bật trước đó rồi!", 3)
+               return
+           end
+
+           local hooked = false
+           local ok, err = pcall(function()
+               local mt = getrawmetatable(game)
+               local oldNamecall = mt.__namecall
+               setreadonly(mt, false)
+               mt.__namecall = newcclosure(function(self, ...)
+                   local method = getnamecallmethod()
+                   if method == "Kick" or method == "kick" then
+                       return nil
+                   end
+                   return oldNamecall(self, ...)
+               end)
+               setreadonly(mt, true)
+               hooked = true
+           end)
+
+           if ok and hooked then
+               antiKickEnabled = true
+               safeNotify("Anti Kick", "Anti Kick đã bật thành công!", 3)
+           else
+               safeNotify("Anti Kick", "Không thể bật Anti Kick (executor có thể chặn hook).", 4)
+           end
+       end
+    })
+
+    -- Test button to fire remote once
+    MainTab:CreateButton({
+       Name = "Test Remote Fire",
+       Callback = function()
+          local char = LocalPlayer.Character
+          if char then
+              local tool = char:FindFirstChildOfClass("Tool")
+              if tool then
+                  local remote = tool:FindFirstChild("Hitbox")
+                  if remote and remote:IsA("RemoteEvent") then
+                      pcall(function() remote:FireServer() end)
+                      safeNotify("Test", "Đã gửi 1 FireServer (nếu có hitbox).", 2)
+                  else
+                      safeNotify("Test", "Không tìm thấy RemoteEvent 'Hitbox' trong tool.", 3)
+                  end
+              else
+                  safeNotify("Test", "Không có tool đang cầm.", 3)
+              end
+          else
+              safeNotify("Test", "Character chưa load xong.", 3)
+          end
+       end
+    })
+else
+    -- If Rayfield couldn't load, still allow toggles via console commands
+    print("Rayfield không load được — UI sẽ không hiển thị nhưng core vẫn hoạt động.")
+end
+
+-- === LOOPS FOR FAST ATTACKS ===
+-- Loop V1 (0.1s)
+task.spawn(function()
+    while task.wait(0.1) do
+        if fastV1 then
+            local char = LocalPlayer.Character
+            if char then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    local remote = tool:FindFirstChild("Hitbox")
+                    if remote and remote:IsA("RemoteEvent") then
+                        pcall(function() remote:FireServer() end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Loop V2 (0.08s)
+task.spawn(function()
+    while task.wait(0.08) do
+        if fastV2 then
+            local char = LocalPlayer.Character
+            if char then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    local remote = tool:FindFirstChild("Hitbox")
+                    if remote and remote:IsA("RemoteEvent") then
+                        pcall(function() remote:FireServer() end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+print("[Script] Loaded: ScreenBlack + Webhook + FastAttack V1/V2 + AntiAFK + AntiKick(button) + AutoRejoin")
